@@ -6,6 +6,9 @@
 // Frontend prototype for Apache NetBeans
 // ========================================
 
+
+// Reviewed by Team Member Ben (everything looks good so far, still need to understand certain parts
+// of the syntax; good job, Quang.
 // 1. DOM HELPERS AND STORAGE
 
 const $ = (selector) => document.querySelector(selector);
