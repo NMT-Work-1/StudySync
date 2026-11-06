@@ -21,10 +21,14 @@ create table tasks (
 	description text,
 	due_date DATETIME, 
 	status varchar(20) not null default 'Pending',
-	is_immediate BOOLEAN NOT NULL DEFAULT FALSE,
-	
+	is_immediate boolean not null default false,
+	duration_estimate int null,
+	parent_task_id int null,
+
 	-- Links each task to the user who created it
 	foreign key (user_id) references users(user_id)
+	-- Links subtasks to their parent task
+	foreign key (parent_task_id) references tasks(task_id)
 );
 
 -- Brain Dump: one autosaved record per user
