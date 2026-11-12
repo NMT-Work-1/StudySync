@@ -62,6 +62,21 @@ create table agent_logs (
     index idx_agent_logs_created (created_at)
 );
 
+-- stores calendar events scheduled by users
+create table calendar_events (
+	event_id int primary key auto_increment,
+	user_id int not null,
+	task_id int null,
+	title varchar(255) not null,
+	start_time datetime not null,
+	end_time datetime not null,
+	created_at timestamp not null default current_timestamp,
+	
+	foreign key (user_id) references users(user_id),
+	foreign key (task_id) references tasks(task_id),
+	
+	index idx_calendar_user_time (user_id, start_time, end_time)
+);
 
 -- Sample data for testing
 
@@ -78,6 +93,10 @@ values (
     true
 );
 
+insert into tasks (user_id, title, duration_estimate, parent_task_id)
+values
+    (1, 'Test task retrieval using JDBC', 30, 1),
+    (1, 'Test agent tool endpoints', 45, 1);
 
 insert into brain_dumps (user_id, content)
 values (
@@ -92,6 +111,15 @@ values (
     'create_micro_tasks',
     '{"goal": "Finish StudySync backend"}',
     '{"result": "Created 3 micro-tasks"}'
+);
+
+insert into calendar_events (user_id, task_id, title, start_time, end_time)
+values (
+    1,
+    1,
+    'Review StudySync backend',
+    '2026-11-12 09:00:00',
+    '2026-11-12 10:00:00'
 );
 
 
