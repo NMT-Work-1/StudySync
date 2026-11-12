@@ -8,7 +8,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.sql.SQLException;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonElement;
@@ -16,6 +15,10 @@ import com.google.gson.JsonObject;
 import com.studysync.database.DatabaseConnection;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 
 @WebServlet("/api/tasks/create")
 public class CreateMicroTasksServlet extends HttpServlet {
@@ -23,48 +26,42 @@ public class CreateMicroTasksServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        // Check if the user is logged in
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("userId") == null) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("{\"success\": false, \"error\": \"User not logged in\"}");
                 return;
         }
+        // Retrieve the userId        
         int userId = (Integer) session.getAttribute("userId");
         
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-        
         // Store values for database insertion
-        String parentTitle;
+        JsonObject jsonObject;
         JsonArray jsonArray;
 
         // Read the JSON request from the agent
         try {
             BufferedReader reader = request.getReader();
-            JsonObject jsonObject = JsonParser.parseReader(reader).getAsJsonObject();
+            jsonObject = JsonParser.parseReader(reader).getAsJsonObject();
             
-            //Check the parent task title
+            //Validate the parent task title
             if (!jsonObject.has("parentTitle")
                 || jsonObject.get("parentTitle").isJsonNull()
                 || !jsonObject.get("parentTitle").isJsonPrimitive()
-                || !jsonObject.get("parentTitle").getAsJsonPrimitive().isString()) {
+                || !jsonObject.get("parentTitle").getAsJsonPrimitive().isString()
+                || jsonObject.get("parentTitle").getAsString().trim().isEmpty()) {
 
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 response.getWriter().write("{\"success\": false, \"error\": \"Invalid parent task title\"}");
                 return;
             }
             
-            parentTitle = jsonObject.get("parentTitle").getAsString();
-
-            if (parentTitle.trim().isEmpty()) {
-                
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.getWriter().write("{\"success\": false, \"error\": \"Invalid parent task title\"}");
-                return;
-            }
-            
-            //Check the subtasks array
+            //Validate the subtasks array
             if (!jsonObject.has("subtasks") || jsonObject.get("subtasks").isJsonNull() 
                 || !jsonObject.get("subtasks").isJsonArray()) {
                 
@@ -72,7 +69,7 @@ public class CreateMicroTasksServlet extends HttpServlet {
                 response.getWriter().write("{\"success\": false, \"error\": \"Invalid subtasks array\"}");
                 return;
             }
-
+            //Retrieve subtasks array
             jsonArray = jsonObject.getAsJsonArray("subtasks");
            
             if (jsonArray.isEmpty()) {
@@ -90,35 +87,19 @@ public class CreateMicroTasksServlet extends HttpServlet {
                     return;
                 }  
                 JsonObject subtask = element.getAsJsonObject();
-                if (!subtask.has("title") || !subtask.has("durationEstimate")) {
-                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    response.getWriter().write("{\"success\": false, \"error\": \"Missing required subtask fields\"}");
-                    return;
-                }
-                if (subtask.get("title").isJsonNull() || subtask.get("durationEstimate").isJsonNull()) {
-                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    response.getWriter().write("{\"success\": false, \"error\": \"Subtask fields cannot be null\"}");
-                    return;
-                }
-                //Check  the subtask data types
-                if (!subtask.get("title").isJsonPrimitive() || !subtask.get("title").getAsJsonPrimitive().isString()
-                        || !subtask.get("durationEstimate").isJsonPrimitive() 
-                        || !subtask.get("durationEstimate").getAsJsonPrimitive().isNumber()) {
+                if (!subtask.has("title") || !subtask.has("durationEstimate")
+                    || subtask.get("title").isJsonNull() || subtask.get("durationEstimate").isJsonNull()
+                    || !subtask.get("title").isJsonPrimitive()
+                    || !subtask.get("title").getAsJsonPrimitive().isString()
+                    || subtask.get("title").getAsString().trim().isEmpty()
+                    || !subtask.get("durationEstimate").isJsonPrimitive()
+                    || !subtask.get("durationEstimate").getAsJsonPrimitive().isNumber()
+                    || subtask.get("durationEstimate").getAsInt() <= 0) {
 
                     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    response.getWriter().write("{\"success\": false, \"error\": \"Invalid subtask data types\"}");
+                    response.getWriter().write("{\"success\": false, \"error\": \"Invalid subtask data\"}");
                     return;
                 }
-                
-                String title = subtask.get("title").getAsString();
-                int durationEstimate = subtask.get("durationEstimate").getAsInt();
-                // Check that the title and duration are valid
-                if (title.trim().isEmpty() || durationEstimate <= 0) {
-                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    response.getWriter().write("{\"success\": false, \"error\": \"Invalid subtask title or duration\"}");
-                    return;
-                }
-            }
         } catch (Exception e) {
             // Handle invalid JSON input
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -136,19 +117,22 @@ public class CreateMicroTasksServlet extends HttpServlet {
         try {
             // Open a database connection and prepare the insert statement
             connection = DatabaseConnection.getConnection();
-            statement = connection.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS);
+            statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+
+            // Retrieve parent title
+            String parentTitle = jsonObject.get("parentTitle").getAsString();
             
             statement.setInt(1, userId);
             statement.setString(2, parentTitle);
-            statement.setNull(3, java.sql.Types.INTEGER);
-            statement.setNull(4, java.sql.Types.INTEGER);
+            statement.setNull(3, Types.INTEGER);
+            statement.setNull(4, Types.INTEGER);
 
             statement.executeUpdate();
             
             // Get the ID generated for the parent task
             int parentTaskId;
 
-            try (java.sql.ResultSet generatedKeys = statement.getGeneratedKeys()) {
+            try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     parentTaskId = generatedKeys.getInt(1);
                 } else {
@@ -173,7 +157,7 @@ public class CreateMicroTasksServlet extends HttpServlet {
                 statement.executeUpdate();
                 
                 // Get and store the ID generated for this subtask
-                try (java.sql.ResultSet generatedKeys = statement.getGeneratedKeys()) {
+                try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
                     if (generatedKeys.next()) {
                         subtaskIDs.add(generatedKeys.getInt(1));
                     } else {
