@@ -26,7 +26,7 @@ create table tasks (
 	parent_task_id int null,
 
 	-- Links each task to the user who created it
-	foreign key (user_id) references users(user_id)
+	foreign key (user_id) references users(user_id),
 	-- Links subtasks to their parent task
 	foreign key (parent_task_id) references tasks(task_id)
 );
