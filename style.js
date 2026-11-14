@@ -567,7 +567,7 @@ $("#categorizeBtn").addEventListener("click", () => {
     showToast("Note categorized using demo rules");
 });
 
-// 8. AI AGENT COMMAND (RULE-BASED DEMO)
+// 8. AI AGENT COMMAND (CONNECTED TO AGENTSERVLET REACT LOOP)
 
 function addChatMessage(message, sender) {
     const element = document.createElement("div");
@@ -578,12 +578,19 @@ function addChatMessage(message, sender) {
             : "message agent-message";
 
     element.textContent = message;
+    element.style.whiteSpace = "pre-line";
 
     $("#chat").appendChild(element);
     $("#chat").scrollTop = $("#chat").scrollHeight;
+    return element;
 }
 
-$("#agentForm").addEventListener("submit", (event) => {
+const statusBadge = document.querySelector("#agentPanel .status");
+if (statusBadge) {
+    statusBadge.textContent = "● ReAct Agent Ready";
+}
+
+$("#agentForm").addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const input = $("#agentInput");
@@ -593,72 +600,104 @@ $("#agentForm").addEventListener("submit", (event) => {
         return;
     }
 
+    // 1. Render user prompt immediately in chat
     addChatMessage(command, "user");
     input.value = "";
 
-    const lower = command.toLowerCase();
-
-    // Command: reorganize schedule.
-    if (/schedule|replan|reorganize|conflict|reschedule/i.test(lower)) {
-        const missed = planSchedule();
-
-        renderDashboard();
-
-        if (missed > 0) {
-            addChatMessage(
-                `I rebuilt your study plan, but ${missed} ` +
-                "half-hour blocks could not fit before deadlines.",
-                "agent"
-            );
-        } else {
-            addChatMessage(
-                "I rebuilt your study plan around classes " +
-                "and work shifts using available 30-minute blocks.",
-                "agent"
-            );
-        }
-
-        return;
+    // 2. Show live ReAct thinking state
+    if (statusBadge) {
+        statusBadge.textContent = "● Running ReAct Loop...";
     }
-
-    // Command: create assignment.
-    if (/task|assignment|homework|project|finish|submit/i.test(lower)) {
-        const title = command
-            .replace(
-                /^(please\s+)?(add|create|finish|submit|plan)\s+/i,
-                ""
-            )
-            .slice(0, 100);
-
-        state.tasks.push({
-            id: Date.now(),
-            title: title,
-            due: dayOffset(3),
-            hours: 2,
-            priority: "Medium",
-            done: false
-        });
-
-        const missed = planSchedule();
-        renderDashboard();
-
-        addChatMessage(
-            `Created "${title}" with four 30-minute ` +
-            "study blocks and a default deadline of 3 days. " +
-            (missed ? "Some blocks could not fit." : ""),
-            "agent"
-        );
-
-        return;
-    }
-
-    addChatMessage(
-        "I can create assignments or rebuild your schedule. " +
-        'Try "Plan my algorithms project" or ' +
-        '"Reorganize my schedule". ' +
-        "This is a rule-based prototype, not a connected AI model.",
+    const thinkingBubble = addChatMessage(
+        "Thinking... executing Plan-Act-Observe loop with Gemini...",
         "agent"
     );
+
+    try {
+        // 3. Send prompt to AgentServlet backend
+        const response = await fetch(
+            `api/agent/test?prompt=${encodeURIComponent(command)}`,
+            {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json"
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Remove temporary thinking bubble
+        thinkingBubble.remove();
+
+        // 4. Display the step-by-step ReAct trace if returned by AgentServlet
+        if (Array.isArray(data.steps) && data.steps.length > 0) {
+            const traceLines = data.steps
+                .filter(s => s.action && s.action !== "FINAL_ANSWER")
+                .map(s => `[Step ${s.step}] Action: ${s.action}\n↳ Thought: ${s.thought}\n↳ Observation: ${s.observation}`);
+
+            if (traceLines.length > 0) {
+                addChatMessage(traceLines.join("\n\n"), "agent");
+            }
+        }
+
+        // 5. Sync newly created micro-tasks and scheduled events to the UI dashboard
+        if (Array.isArray(data.createdTasks) && data.createdTasks.length > 0) {
+            data.createdTasks.forEach((subtask, idx) => {
+                const mins = Number(subtask.durationEstimate) || 30;
+                state.tasks.push({
+                    id: Date.now() + idx,
+                    title: subtask.title || "Study Micro-Task",
+                    due: dayOffset(1),
+                    hours: Math.max(0.5, Math.round((mins / 60) * 2) / 2),
+                    priority: "High",
+                    done: false
+                });
+            });
+            planSchedule();
+        }
+
+        if (Array.isArray(data.scheduledEvents) && data.scheduledEvents.length > 0) {
+            data.scheduledEvents.forEach((ev, idx) => {
+                const startParts = String(ev.startTime || "").split("T");
+                const endParts = String(ev.endTime || "").split("T");
+                state.events.push({
+                    id: `agent-event-${Date.now()}-${idx}`,
+                    title: ev.title || "Scheduled Study Block",
+                    date: startParts[0] || dayOffset(0),
+                    start: (startParts[1] || "09:00").slice(0, 5),
+                    end: (endParts[1] || "09:30").slice(0, 5),
+                    type: "Study"
+                });
+            });
+            saveState();
+        }
+
+        renderDashboard();
+
+        // 6. Display the Agent's Final Answer
+        if (data.success) {
+            addChatMessage(data.message, "agent");
+            showToast("Agent completed ReAct workflow");
+        } else {
+            addChatMessage(data.error || "The agent encountered an error.", "agent");
+        }
+    } catch (error) {
+        console.error("Agent communication failed:", error);
+        thinkingBubble.remove();
+        addChatMessage(
+            "Could not reach AgentServlet. Verify Apache Tomcat is running on localhost:8080.",
+            "agent"
+        );
+    } finally {
+        if (statusBadge) {
+            statusBadge.textContent = "● ReAct Agent Ready";
+        }
+    }
 });
 
 // 9. SETTINGS
