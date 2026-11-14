@@ -1,11 +1,11 @@
 package com.studysync.servlet;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -23,21 +23,16 @@ public class ScheduleEventServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
-        // Check if the user is logged in
-        HttpSession session = request.getSession(false);
 
-        if (session == null || session.getAttribute("userId") == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("{\"success\": false, \"message\": \"Not logged in\"}");
-            return;
-        }
-        // Retrieve the userId
-        int userId = (Integer) session.getAttribute("userId");
-        
+        // Retrieve logged-in userId from session, or fallback to default test user (user_id = 1)
+        HttpSession session = request.getSession(false);
+        int userId = (session != null && session.getAttribute("userId") != null)
+                ? (Integer) session.getAttribute("userId")
+                : 1;
+
         String title = request.getParameter("title");
         String startTime = request.getParameter("startTime");
         String endTime = request.getParameter("endTime");
@@ -59,11 +54,11 @@ public class ScheduleEventServlet extends HttpServlet {
         Integer taskId = null;
 
         try {
-            start = LocalDateTime.parse(startTime);
-            end = LocalDateTime.parse(endTime);
+            start = LocalDateTime.parse(startTime.trim().replace(" ", "T"));
+            end = LocalDateTime.parse(endTime.trim().replace(" ", "T"));
 
             if (taskIdParam != null && !taskIdParam.trim().isEmpty()) {
-                taskId = Integer.parseInt(taskIdParam);
+                taskId = Integer.parseInt(taskIdParam.trim());
 
                 if (taskId <= 0) {
                     throw new NumberFormatException();
