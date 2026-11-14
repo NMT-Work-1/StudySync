@@ -567,7 +567,7 @@ $("#categorizeBtn").addEventListener("click", () => {
     showToast("Note categorized using demo rules");
 });
 
-// 8. AI AGENT COMMAND (RULE-BASED DEMO)
+// 8. AI AGENT COMMAND
 
 function addChatMessage(message, sender) {
     const element = document.createElement("div");
@@ -583,82 +583,38 @@ function addChatMessage(message, sender) {
     $("#chat").scrollTop = $("#chat").scrollHeight;
 }
 
-$("#agentForm").addEventListener("submit", (event) => {
+$("#agentForm").addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const input = $("#agentInput");
     const command = input.value.trim();
 
-    if (!command) {
-        return;
-    }
+    if (!command) return;
 
     addChatMessage(command, "user");
     input.value = "";
 
-    const lower = command.toLowerCase();
-
-    // Command: reorganize schedule.
-    if (/schedule|replan|reorganize|conflict|reschedule/i.test(lower)) {
-        const missed = planSchedule();
-
-        renderDashboard();
-
-        if (missed > 0) {
-            addChatMessage(
-                `I rebuilt your study plan, but ${missed} ` +
-                "half-hour blocks could not fit before deadlines.",
-                "agent"
-            );
-        } else {
-            addChatMessage(
-                "I rebuilt your study plan around classes " +
-                "and work shifts using available 30-minute blocks.",
-                "agent"
-            );
-        }
-
-        return;
-    }
-
-    // Command: create assignment.
-    if (/task|assignment|homework|project|finish|submit/i.test(lower)) {
-        const title = command
-            .replace(
-                /^(please\s+)?(add|create|finish|submit|plan)\s+/i,
-                ""
-            )
-            .slice(0, 100);
-
-        state.tasks.push({
-            id: Date.now(),
-            title: title,
-            due: dayOffset(3),
-            hours: 2,
-            priority: "Medium",
-            done: false
+    try {
+        const response = await fetch("/StudySync/api/agent", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: new URLSearchParams({ goal: command }),
+            credentials: "same-origin"
         });
 
-        const missed = planSchedule();
-        renderDashboard();
+        const result = await response.json();
 
-        addChatMessage(
-            `Created "${title}" with four 30-minute ` +
-            "study blocks and a default deadline of 3 days. " +
-            (missed ? "Some blocks could not fit." : ""),
-            "agent"
-        );
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || "Agent request failed.");
+        }
 
-        return;
+        addChatMessage(result.message, "agent");
+
+    } catch (error) {
+        addChatMessage("Error: " + error.message, "agent");
     }
-
-    addChatMessage(
-        "I can create assignments or rebuild your schedule. " +
-        'Try "Plan my algorithms project" or ' +
-        '"Reorganize my schedule". ' +
-        "This is a rule-based prototype, not a connected AI model.",
-        "agent"
-    );
 });
 
 // 9. SETTINGS
