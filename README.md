@@ -58,8 +58,8 @@ Our `AgentServlet` acts as the central orchestrator using a Gemini Flash model, 
 | Servlet Class | URL Endpoint | HTTP Method | Agent Tool / Role Implemented |
 | :--- | :--- | :--- | :--- |
 | `AgentServlet` | `/api/agent` | `POST` | **ReAct Orchestrator**: Runs the Thought-Action-Observation loop, communicates with the Gemini API via OkHttp, and dispatches calls to the tool endpoints. |
-| `CreateMicroTasksServlet` | `/api/tasks/create` | `POST` | **`CREATE_MICROTASK` **: Accepts a JSON payload with a `parentTitle` and an array of `subtasks` (`title` and `durationEstimate` in minutes), saving them to the `tasks` table. |
-| `QueryAvailabilityServlet` | `/api/calendar/free-time` | `GET` | **`QUERY_AVAILABILITY` **: Checks the user's schedule between startDate and endDate, within the daily availableFrom and availableUntil time range, for open time blocks that fit requiredMinutes. |
+| `CreateMicroTasksServlet` | `/api/tasks/create` | `POST` | **`CREATE_MICROTASK`**: Accepts a JSON payload with a `parentTitle` and an array of `subtasks` (`title` and `durationEstimate` in minutes), saving them to the `tasks` table. |
+| `QueryAvailabilityServlet` | `/api/calendar/free-time` | `GET` | **`QUERY_AVAILABILITY`**: Checks the user's schedule between startDate and endDate, within the daily availableFrom and availableUntil time range, for open time blocks that fit requiredMinutes. |
 | `ScheduleEventServlet` | `/api/calendar/book` | `POST` | **`SCHEDULE_EVENT`**: Books a specific study block onto the calendar using form parameters (`title`, `startTime`, `endTime`, and optional `taskId`). |
 
 The AgentServlet uses a Gemini Flash model through the Gemini API. The model can be configured to use Gemini 3.6 Flash or Gemini 3.5 Flash Lite, depending on API availability and request volume. If one model experiences high request volumes or becomes unavailable, the other can be used as an alternative.
