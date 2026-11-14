@@ -78,7 +78,7 @@ create table calendar_events (
 	index idx_calendar_user_time (user_id, start_time, end_time)
 );
 
--- Sample data for testing
+-- Sample data for testing and initial database setup
 
 insert into users (username, email, password_hash)
 values ('testuser', 'test@example.com', 'temporary');
@@ -118,8 +118,8 @@ values (
     1,
     1,
     'Review StudySync backend',
-    '2026-11-12 09:00:00',
-    '2026-11-12 10:00:00'
+    '2026-11-15 09:00:00',
+    '2026-11-15 10:00:00'
 );
 
 
