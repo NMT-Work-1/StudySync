@@ -3,6 +3,10 @@ package com.studysync.servlet;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
@@ -113,17 +117,12 @@ public class AgentServlet extends HttpServlet {
         // 1. Get API Key
         String apiKey;
         try {
-            // Retrieve the Gemini API key from an environment variable
-            apiKey = System.getenv("GEMINI_API_KEY");
+            // For local testing: Retrieve the Gemini API key from an environment variable
+            //apiKey = System.getenv("GEMINI_API_KEY");
 
-            /*
-             Alternative deployment configuration:
-             The API key can be stored in a file named .gemini_key
-             in the application's user's home directory.
-             
+            // For deployment: Retrieve the Gemini API key from a configuration file
             Path keyPath = Paths.get(System.getProperty("user.home"), ".gemini_key");
             apiKey = Files.readString(keyPath, StandardCharsets.UTF_8).trim();
-            */
 
             // Validate the retrieved API key
             if (apiKey == null || apiKey.trim().isEmpty()) {
